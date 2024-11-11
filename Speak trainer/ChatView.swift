@@ -1,10 +1,9 @@
 import SwiftUI
 
 struct ChatView: View {
-       let selectedTopic: ConversationTopic?
+    let selectedTopic: ConversationTopic?
     let selectedLevel: LanguageLevel
     let selectedLanguage: Language_speak
-//    var chatHistory: [[String: String]] = []
     @ObservedObject private var audioRecorder = AudioRecorderService()
     @State private var messages: [Message] = []
     @State private var inputText: String = ""
@@ -17,22 +16,43 @@ struct ChatView: View {
                         HStack {
                             if message.isUser {
                                 Spacer()
-                                Text(message.text)
-                                    .padding()
-                                    .background(Color.blue.opacity(0.7))
-                                    .foregroundColor(.white)
-                                    .cornerRadius(10)
+                                VStack(alignment: .trailing) {
+                                    if let audioData = message.audioData {
+                                        // Кнопка воспроизведения для аудиосообщений
+                                        Button(action: {
+                                            audioPlayerService.playAudio(from: audioData)
+                                        }) {
+                                            Image(systemName: "play.circle")
+                                                .font(.title)
+                                        }
+                                    }
+                                    Text(message.text)
+                                        .padding()
+                                        .background(Color.blue.opacity(0.7))
+                                        .foregroundColor(.white)
+                                        .cornerRadius(10)
+                                }
                             } else {
-                                Text(message.text)
-                                    .padding()
-                                    .background(Color.gray.opacity(0.2))
-                                    .cornerRadius(10)
+                                VStack(alignment: .leading) {
+                                    if let audioData = message.audioData {
+                                        // Кнопка воспроизведения для аудиосообщений
+                                        Button(action: {
+                                            audioPlayerService.playAudio(from: audioData)
+                                        }) {
+                                            Image(systemName: "play.circle")
+                                                .font(.title)
+                                        }
+                                    }
+                                    Text(message.text)
+                                        .padding()
+                                        .background(Color.gray.opacity(0.2))
+                                        .cornerRadius(10)
+                                }
                                 Spacer()
                             }
                         }
                     }
                     
-                    // Отображение транскрипции пользователя, если есть
                     if let transcription = audioRecorder.transcriptionText {
                         HStack {
                             Text(transcription)
@@ -43,7 +63,6 @@ struct ChatView: View {
                         }
                     }
                     
-                    // Индикатор загрузки во время обработки аудио
                     if audioRecorder.isProcessing {
                         ProgressView("Обработка аудио...")
                             .padding()
@@ -66,15 +85,12 @@ struct ChatView: View {
             }
             .padding()
             
-            // Кнопка для записи аудио
             Button(action: {
                 if audioRecorder.isRecording {
-                    audioRecorder.stopRecording { transcription in
+                    audioRecorder.stopRecording { transcription, audioData in
                         if let text = transcription {
-                            addUserMessage(text)
-                            Task {
-                                await getBotResponse(for: text)
-                            }
+                            addUserMessage(text, audioData: audioData)
+                            
                         }
                     }
                 } else {
@@ -92,45 +108,27 @@ struct ChatView: View {
         .onAppear {
             startConversation()
         }
-        .onChange(of: audioRecorder.transcriptionText) {
-            if let text = audioRecorder.transcriptionText {
-//            if let text = audioRecorder.transcriptionText {
-                addUserMessage(text)
-                //addUserMessage(text)
-                
-                Task {
-                    await getBotResponse(for: text)
-                }
-               // audioRecorder.generateBotResponse(for: text) // Запрос к API для получения ответа
-            }
-        }
-//        .onChange(of: audioRecorder.botResponseText) {
-//            if let response = audioRecorder.botResponseText {
-//                addBotMessage(response)
-//                audioRecorder.generateSpeechFromText(for: response)
-//            }
-//        }
+        
     }
     
     private func getBotResponse(for userMessage: String) async {
-
-        let botResponse = await OpenAI.shared.chatAi(prompt: userMessage)
-        addBotMessage(botResponse)
-        let audioData = await OpenAI.shared.textToSpeechAi(prompt: botResponse)
-       
-        audioPlayerService.playAudio(from: audioData)
-//        audioRecorder.generateSpeechFromText(for: botResponse)
+        
+        let botResponse = await OpenAI.shared.chatAi(messages: messages)
+        let playAudioNow = await OpenAI.shared.textToSpeechAi(prompt: botResponse)
+        
+        addBotMessage(botResponse, audioData: playAudioNow)
+        audioPlayerService.playAudio(from: playAudioNow)
     }
     
     private func startConversation() {
         guard let topic = selectedTopic else { return }
+        let startPromt = "Ты преводователь выбранного языка, мы практикуем короткие диологи, ты подстраиваешься под уровень собеседника и разговариваешь на предложенные темы. Если ученик буде делать ошибки исправляй  и говори в каких местах  сделаны ошибки. Тема: \(topic.name), Язык: \(selectedLanguage.rawValue), Уровень: \(selectedLevel.rawValue)"
         
-        messages.append(Message(text: "Тема: \(topic.name), Язык: \(selectedLanguage.rawValue), Уровень: \(selectedLevel.rawValue)", isUser: false, timestamp: Date()))
-        //audioRecorder.generateBotResponse(for: "Начинаем урок: Тема: \(topic.name), Язык: \(selectedLanguage.rawValue), Уровень: \(selectedLevel.rawValue)")
-//        Task {
-//            await getBotResponse(for: "Начинаем урок: Тема: \(topic.name), Язык: \(selectedLanguage.rawValue), Уровень: \(selectedLevel.rawValue)")
-//        }
-
+        messages.append(Message(text: startPromt, isUser: false, timestamp: Date()))
+        Task {
+            await getBotResponse(for: startPromt)
+        }
+        
         
     }
     
@@ -142,16 +140,18 @@ struct ChatView: View {
         Task {
             await getBotResponse(for: inputText)
         }
-        // В будущем: добавить логику для отправки текстового сообщения в API и получения ответа
     }
     @MainActor
-    private func addUserMessage(_ text: String) {
-        let message = Message(text: text, isUser: true, timestamp: Date())
+    private func addUserMessage(_ text: String, audioData: Data?) {
+        let message = Message(text: text, isUser: true, timestamp: Date(), audioData: audioData)
         messages.append(message)
+        Task {
+            await getBotResponse(for: text)
+        }
     }
     @MainActor
-    private func addBotMessage(_ text: String) {
-        let message = Message(text: text, isUser: false, timestamp: Date())
+    private func addBotMessage(_ text: String, audioData: Data?) {
+        let message = Message(text: text, isUser: false, timestamp: Date(), audioData: audioData)
         messages.append(message)
     }
 }

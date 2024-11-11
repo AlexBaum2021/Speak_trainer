@@ -27,9 +27,19 @@ enum LanguageLevel: String, CaseIterable {
     case advanced = "Продвинутый"
 }
 
-enum ChatMessageRole: String, CaseIterable {
-    case user = "Пользователь"
-    case assistant = "Асистент"
+
+struct ChatMessage {
+    let role: ChatMessageRole
+    let content: ChatMessageContent
+}
+
+enum ChatMessageRole: String {
+    case user = "user"
+    case assistant = "assistant"
+}
+
+enum ChatMessageContent {
+    case text(String)
 }
 
 struct Message: Identifiable {
@@ -37,6 +47,7 @@ struct Message: Identifiable {
     let text: String
     let isUser: Bool
     let timestamp: Date
+    var audioData: Data? 
     var role: ChatMessageRole {
             return isUser ? .user : .assistant
         }

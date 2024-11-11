@@ -13,10 +13,9 @@ import AVFoundation
 class OpenAI {
     
     static let shared = OpenAI()
-    @Published var isProcessing = false // Состояние индикации процесса обработки аудио
+    @Published var isProcessing = false
     
-//    private let openAIKey = Bundle.main.object(forInfoDictionaryKey: "OPENAI_API_KEY") as? String ?? ""
-//        private let openAIKey: String = OpenAIKey
+
     private lazy var service: OpenAIService = {
         return OpenAIServiceFactory.service(apiKey: apiKey())
     }()
@@ -34,8 +33,13 @@ class OpenAI {
         return ""
     }
     
-    func chatAi(prompt: String) async -> String {
-        let parameters = ChatCompletionParameters(messages: [.init(role: .user, content: .text(prompt))], model: .custom("gpt-4o-mini"))
+    func chatAi(messages: [Message]) async -> String {
+        let chatMessages = messages.map { message in
+            ChatCompletionParameters.Message(
+                    role: message.isUser ? .user : .assistant,
+                    content: .text(message.text))
+          }
+        let parameters = ChatCompletionParameters(messages: chatMessages, model: .custom("gpt-4o-mini"))
         var result = ""
         do {
             let chatCompletionObject = try await service.startChat(parameters: parameters)
@@ -111,31 +115,31 @@ class OpenAI {
     
     func transcriptionAi(audioURL: URL, language: String) async -> String {
 
-        // Устанавливаем флаг обработки
+        
         isProcessing = true
         
         do {
-            // Загружаем данные аудиофайла
+            // Load audio file data
             let audioData = try Data(contentsOf: audioURL)
             let fileName = audioURL.lastPathComponent
             
-            // Настраиваем параметры для транскрипции
+            // Set up parameters for transcription
             let parameters = AudioTranscriptionParameters(
                 fileName: fileName,
                 file: audioData,
                 model: .whisperOne,
-                language: language // Немецкий язык, ISO-639-1 код
+                language: language //  ISO-639-1
             )
             
-            // Отправляем запрос на транскрипцию
+            // Sending a request for transcription
             let audioObject = try await service.createTranscription(parameters: parameters)
             
             
-            // Снимаем флаг обработки и возвращаем текст транскрипции
+            
             isProcessing = false
             return audioObject.text
         } catch {
-            // Обработка ошибок и возврат ошибки в виде строки
+           
             isProcessing = false
             print("Ошибка при транскрипции аудиофайла: \(error.localizedDescription)")
             return "Ошибка при транскрипции аудиофайла: \(error.localizedDescription)"
@@ -145,19 +149,12 @@ class OpenAI {
     
     func textToSpeechAi(prompt: String) async -> Data  {
         
-       // let prompt = "Hello, how are you today?"
         let parameters = AudioSpeechParameters(model: .tts1, input: prompt, voice: .shimmer)
        var audioData: Data?
 
-        // Play data
-        
-        
-  
         do {
             let audioObjectData = try await service.createSpeech(parameters: parameters).output
-            //playAudio(from: audioObjectData)
             audioData = audioObjectData
-           
             
         } catch APIError.responseUnsuccessful(let description) {
            print("Network error with description: \(description)")
@@ -166,20 +163,7 @@ class OpenAI {
         }
         return  audioData!
     }
-//    private func playAudio(from data: Data) {
-//          do {
-//              // Initialize the audio player with the data
-//              audioPlayer = try AVAudioPlayer(data: data)
-//              audioPlayer?.prepareToPlay()
-//              audioPlayer?.play()
-//          } catch {
-//              // Handle errors
-//              print("Error playing audio: \(error.localizedDescription)")
-//          }
-//      }
+
     private init (){}
-    
-    
- 
     
 }

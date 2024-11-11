@@ -26,7 +26,7 @@ class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDelegate 
 
     override init() {
         super.init()
-        let selectedLanguage: Language_speak
+       // let selectedLanguage: Language_speak
 //        let apiKey = OpenAIKey
 //        let service = OpenAIServiceFactory.service(apiKey: apiKey)
         recordingSession = AVAudioSession.sharedInstance()
@@ -68,7 +68,7 @@ class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDelegate 
         }
     }
     
-    func stopRecording(completion: @escaping (String?) -> Void) {
+    func stopRecording(completion: @escaping  (String?, Data?) -> Void){
         audioRecorder?.stop()
         isRecording = false
         print("Запись аудио завершена.")
@@ -76,7 +76,8 @@ class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDelegate 
         if let audioURL = audioFilename {
             Task {
                 let transcription = await OpenAI.shared.transcriptionAi(audioURL: audioURL, language: "de")
-                completion(transcription)
+                let audioData = try? Data(contentsOf: audioURL)
+                completion(transcription, audioData)
             }
         }
     }
