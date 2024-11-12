@@ -1,55 +1,32 @@
 import SwiftUI
 
 struct ChatView: View {
+        @ObservedObject private var audioRecorder = AudioRecorderService()
+    @StateObject private var audioPlayerService = AudioPlayerService()
+    @State private var messages: [Message] = []
+    @State private var inputText: String = ""
     let selectedTopic: ConversationTopic?
     let selectedLevel: LanguageLevel
     let selectedLanguage: Language_speak
-    @ObservedObject private var audioRecorder = AudioRecorderService()
-    @State private var messages: [Message] = []
-    @State private var inputText: String = ""
-    let audioPlayerService = AudioPlayerService()
+    
     var body: some View {
         VStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(messages) { message in
+                    ForEach(messages.dropFirst()) { message in
                         HStack {
                             if message.isUser {
-                                Spacer()
-                                VStack(alignment: .trailing) {
-                                    if let audioData = message.audioData {
-                                        // Кнопка воспроизведения для аудиосообщений
-                                        Button(action: {
-                                            audioPlayerService.playAudio(from: audioData)
-                                        }) {
-                                            Image(systemName: "play.circle")
-                                                .font(.title)
-                                        }
-                                    }
-                                    Text(message.text)
-                                        .padding()
-                                        .background(Color.blue.opacity(0.7))
-                                        .foregroundColor(.white)
-                                        .cornerRadius(10)
-                                }
-                            } else {
-                                VStack(alignment: .leading) {
-                                    if let audioData = message.audioData {
-                                        // Кнопка воспроизведения для аудиосообщений
-                                        Button(action: {
-                                            audioPlayerService.playAudio(from: audioData)
-                                        }) {
-                                            Image(systemName: "play.circle")
-                                                .font(.title)
-                                        }
-                                    }
-                                    Text(message.text)
-                                        .padding()
-                                        .background(Color.gray.opacity(0.2))
-                                        .cornerRadius(10)
-                                }
-                                Spacer()
-                            }
+                                                            Spacer()
+                                                            messageView(for: message)
+                                                                .background(Color.blue.opacity(0.7))
+                                                                .foregroundColor(.white)
+                                                                .cornerRadius(10)
+                                                        } else {
+                                                            messageView(for: message)
+                                                                .background(Color.gray.opacity(0.2))
+                                                                .cornerRadius(10)
+                                                            Spacer()
+                                                        }
                         }
                     }
                     
@@ -87,7 +64,7 @@ struct ChatView: View {
             
             Button(action: {
                 if audioRecorder.isRecording {
-                    audioRecorder.stopRecording { transcription, audioData in
+                    audioRecorder.stopRecording (language: selectedLanguage.code ) { transcription, audioData in
                         if let text = transcription {
                             addUserMessage(text, audioData: audioData)
                             
@@ -110,14 +87,64 @@ struct ChatView: View {
         }
         
     }
+            // Helper function for time formatting
+               private func formatTime(_ time: TimeInterval) -> String {
+                   let minutes = Int(time) / 60
+                   let seconds = Int(time) % 60
+                   return String(format: "%02d:%02d", minutes, seconds)
+               }
+            
+    @ViewBuilder
+    private func messageView(for message: Message) -> some View {
+        VStack(alignment: .leading) {
+            Text(message.text)
+                .padding()
+            
+            if message.hasAudio {
+                VStack {
+                    // Отображение текущего времени и оставшегося времени, привязанного к текущему сообщению
+                    let isCurrentMessage = audioPlayerService.currentMessageID == message.id
+                    
+                    Slider(value: Binding(
+                        get: { isCurrentMessage ? audioPlayerService.currentTime : 0 },
+                        set: { newValue in
+                            if isCurrentMessage {
+                                audioPlayerService.seek(to: newValue)
+                            }
+                        }
+                    ), in: 0...audioPlayerService.duration)
+                    
+                    // Используем отдельные переменные для отображения времени
+                    HStack {
+                        Text(formatTime(isCurrentMessage ? audioPlayerService.currentTime : 0))
+                        Spacer()
+                        Text(formatTime(isCurrentMessage ? audioPlayerService.duration - audioPlayerService.currentTime : 0))
+                    }
+                    
+                    // Кнопка воспроизведения/паузы
+                    Button(action: {
+                        if isCurrentMessage {
+                            audioPlayerService.isPlaying ? audioPlayerService.pauseAudio() : audioPlayerService.resumeAudio()
+                        } else {
+                            audioPlayerService.playAudio(for: message.id, with: message.audioData!)
+                        }
+                    }) {
+                        Image(systemName: audioPlayerService.isPlaying && isCurrentMessage ? "pause.circle" : "play.circle")
+                            .font(.system(size: 40))
+                    }
+                }
+            }
+        }
+    }
+
     
     private func getBotResponse(for userMessage: String) async {
         
         let botResponse = await OpenAI.shared.chatAi(messages: messages)
         let playAudioNow = await OpenAI.shared.textToSpeechAi(prompt: botResponse)
-        
-        addBotMessage(botResponse, audioData: playAudioNow)
-        audioPlayerService.playAudio(from: playAudioNow)
+            
+            addBotMessage(botResponse, audioData: playAudioNow)
+           
     }
     
     private func startConversation() {
@@ -149,9 +176,14 @@ struct ChatView: View {
             await getBotResponse(for: text)
         }
     }
-    @MainActor
+
     private func addBotMessage(_ text: String, audioData: Data?) {
         let message = Message(text: text, isUser: false, timestamp: Date(), audioData: audioData)
         messages.append(message)
+        if let data = message.audioData {
+                 audioPlayerService.playAudio(for: message.id, with: data)
+             }
     }
 }
+
+

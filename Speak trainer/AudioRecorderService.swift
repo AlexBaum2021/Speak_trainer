@@ -62,20 +62,20 @@ class AudioRecorderService: NSObject, ObservableObject, AVAudioRecorderDelegate 
             audioRecorder?.record()
             
             isRecording = true
-            print("Начата запись аудио в файл \(audioFilename)")
+            print("Started recording audio to file \(audioFilename)")
         } catch {
-            print("Не удалось начать запись аудио: \(error)")
+            print("Failed to start recording audio: \(error)")
         }
     }
     
-    func stopRecording(completion: @escaping  (String?, Data?) -> Void){
+    func stopRecording(language: String, completion: @escaping  (String?, Data?) -> Void){
         audioRecorder?.stop()
         isRecording = false
-        print("Запись аудио завершена.")
+        print("Audio recording complete.")
 
         if let audioURL = audioFilename {
             Task {
-                let transcription = await OpenAI.shared.transcriptionAi(audioURL: audioURL, language: "de")
+                let transcription = await OpenAI.shared.transcriptionAi(audioURL: audioURL, language: language)
                 let audioData = try? Data(contentsOf: audioURL)
                 completion(transcription, audioData)
             }

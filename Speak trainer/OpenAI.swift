@@ -147,7 +147,7 @@ class OpenAI {
     }
     
     
-    func textToSpeechAi(prompt: String) async -> Data  {
+    func textToSpeechAi(prompt: String) async -> Data?  {
         
         let parameters = AudioSpeechParameters(model: .tts1, input: prompt, voice: .shimmer)
        var audioData: Data?
@@ -161,7 +161,7 @@ class OpenAI {
         } catch {
            print(error.localizedDescription)
         }
-        return  audioData!
+        return  audioData
     }
 
     private init (){}

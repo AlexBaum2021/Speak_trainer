@@ -51,4 +51,10 @@ struct Message: Identifiable {
     var role: ChatMessageRole {
             return isUser ? .user : .assistant
         }
+    // var audioPlayer: AudioPlayerService? // Optional audio player for each message
+    
+    var hasAudio: Bool {
+        return audioData != nil
+    }
+
 }
