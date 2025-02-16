@@ -95,48 +95,42 @@ struct ChatView: View {
                }
             
     @ViewBuilder
-    private func messageView(for message: Message) -> some View {
-        VStack(alignment: .leading) {
-            Text(message.text)
-                .padding()
-            
-            if message.hasAudio {
-                VStack {
-                    // Отображение текущего времени и оставшегося времени, привязанного к текущему сообщению
-                    let isCurrentMessage = audioPlayerService.currentMessageID == message.id
-                    
-                    Slider(value: Binding(
-                        get: { isCurrentMessage ? audioPlayerService.currentTime : 0 },
-                        set: { newValue in
-                            if isCurrentMessage {
-                                audioPlayerService.seek(to: newValue)
-                            }
-                        }
-                    ), in: 0...audioPlayerService.duration)
-                    
-                    // Используем отдельные переменные для отображения времени
-                    HStack {
-                        Text(formatTime(isCurrentMessage ? audioPlayerService.currentTime : 0))
-                        Spacer()
-                        Text(formatTime(isCurrentMessage ? audioPlayerService.duration - audioPlayerService.currentTime : 0))
-                    }
-                    
-                    // Кнопка воспроизведения/паузы
-                    Button(action: {
-                        if isCurrentMessage {
-                            audioPlayerService.isPlaying ? audioPlayerService.pauseAudio() : audioPlayerService.resumeAudio()
-                        } else {
-                            audioPlayerService.playAudio(for: message.id, with: message.audioData!)
-                        }
-                    }) {
-                        Image(systemName: audioPlayerService.isPlaying && isCurrentMessage ? "pause.circle" : "play.circle")
-                            .font(.system(size: 40))
-                    }
-                }
-            }
-        }
-    }
-
+       private func messageView(for message: Message) -> some View {
+           VStack(alignment: .leading) {
+               Text(message.text)
+                   .padding()
+               
+               if message.hasAudio {
+                   VStack {
+                       Slider(value: Binding(
+                           get: { audioPlayerService.currentMessageID == message.id ? audioPlayerService.currentTime : 0 },
+                           set: { newValue in
+                               if audioPlayerService.currentMessageID == message.id {
+                                   audioPlayerService.seek(to: newValue)
+                               }
+                           }
+                       ), in: 0...audioPlayerService.duration)
+                       
+                       HStack {
+                           Text(formatTime(audioPlayerService.currentTime))
+                           Spacer()
+                           Text(formatTime(audioPlayerService.duration - audioPlayerService.currentTime))
+                       }
+                       
+                       Button(action: {
+                           if audioPlayerService.currentMessageID == message.id {
+                               audioPlayerService.isPlaying ? audioPlayerService.pauseAudio() : audioPlayerService.resumeAudio()
+                           } else {
+                               audioPlayerService.playAudio(for: message.id, with: message.audioData!)
+                           }
+                       }) {
+                           Image(systemName: audioPlayerService.isPlaying && audioPlayerService.currentMessageID == message.id ? "pause.circle" : "play.circle")
+                               .font(.system(size: 40))
+                       }
+                   }
+               }
+           }
+       }
     
     private func getBotResponse(for userMessage: String) async {
         
@@ -149,7 +143,7 @@ struct ChatView: View {
     
     private func startConversation() {
         guard let topic = selectedTopic else { return }
-        let startPromt = "Ты преводователь выбранного языка, мы практикуем короткие диологи, ты подстраиваешься под уровень собеседника и разговариваешь на предложенные темы. Если ученик буде делать ошибки исправляй  и говори в каких местах  сделаны ошибки. Тема: \(topic.name), Язык: \(selectedLanguage.rawValue), Уровень: \(selectedLevel.rawValue)"
+        let startPromt = "Ты носитель выбранного языка, мы практикуем короткие диологи, ты подстраиваешься под уровень собеседника и разговариваешь на предложенные темы. Используй только выбранный язык для диалога и обьясней ошибки тоже на выбранном языке. Если ученик буде делать ошибки исправляй  и говори в каких местах  сделаны ошибки. Тема: \(topic.name), Язык: \(selectedLanguage.rawValue), Уровень: \(selectedLevel.rawValue)"
         
         messages.append(Message(text: startPromt, isUser: false, timestamp: Date()))
         Task {

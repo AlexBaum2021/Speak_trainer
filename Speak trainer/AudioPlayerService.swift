@@ -11,12 +11,10 @@ class AudioPlayerService: ObservableObject {
     @Published var currentMessageID: UUID?
     
     func playAudio(for messageID: UUID, with data: Data) {
-        // Если уже играет текущее сообщение, просто продолжить
         if currentMessageID == messageID && isPlaying {
             return
         }
         
-        // Остановить текущее воспроизведение и установить новое сообщение
         stopAudio()
         currentMessageID = messageID
         

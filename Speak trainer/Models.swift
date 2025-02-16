@@ -48,9 +48,7 @@ struct Message: Identifiable {
     let isUser: Bool
     let timestamp: Date
     var audioData: Data? 
-    var role: ChatMessageRole {
-            return isUser ? .user : .assistant
-        }
+   
     // var audioPlayer: AudioPlayerService? // Optional audio player for each message
     
     var hasAudio: Bool {
